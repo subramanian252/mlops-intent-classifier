@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 
 set -e
 
@@ -9,8 +9,7 @@ cd $APP_DIR
 apt update -y
 apt install -y python3 git python3-venv nginx
 
-git clone https://github.com/subramanian252/mlops-intent-classifier.git
-cd mlops-intent-classifier
+git clone https://github.com/subramanian252/mlops-intent-classifier.git .
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install --upgrade pip
@@ -35,27 +34,34 @@ Restart=always
 WantedBy=multi-user.target
 EOL
 
-cat >/etc/nginx/conf.d/mlops-intent-classifier.conf <<EOL
+cat >/etc/nginx/conf.d/mlops-intent-classifier.conf <<'EOL'
 server {
     listen 80;
     server_name _;
 
     location / {
         proxy_pass http://127.0.0.1:6000/predict;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
         proxy_connect_timeout 60s;
         proxy_read_timeout 120s;
     }
 }
 EOL
 
+chown -R ubuntu:ubuntu "$APP_DIR"
+
+
+rm -f /etc/nginx/sites-enabled/default
+
+nginx -t
+
 systemctl daemon-reload
 systemctl enable mlops-intent-classifier
 systemctl start mlops-intent-classifier
-systemctl status mlops-intent-classifier
 systemctl enable nginx
 systemctl restart nginx
-systemctl status nginx
 echo "Done"
